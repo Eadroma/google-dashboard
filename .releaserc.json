@@ -1,0 +1,18 @@
+{
+  "branches": ["main"],
+  "plugins": [
+    "@semantic-release/commit-analyzer",
+    "@semantic-release/release-notes-generator",
+    "@semantic-release/changelog",
+    ["@semantic-release/npm", { "npmPublish": false }],
+    ["@semantic-release/github", { "assets": [{ "path": "google-dashboard-*.zip", "label": "Extension zip (load unpacked or upload to the Chrome Web Store)" }] }],
+    ["@semantic-release/exec", {
+      "prepareCmd": "node -e \"const fs=require('fs'),f='public/manifest.json',m=JSON.parse(fs.readFileSync(f));m.version='${nextRelease.version}';fs.writeFileSync(f,JSON.stringify(m,null,2)+'\\n')\" && npm run build && cd dist && zip -qr ../google-dashboard-${nextRelease.version}.zip .",
+      "publishCmd": "if [ -n \"$REFRESH_TOKEN\" ]; then npx -y chrome-webstore-upload-cli@4 --source google-dashboard-${nextRelease.version}.zip; else echo 'Chrome Web Store secrets not set: skipping store upload'; fi"
+    }],
+    ["@semantic-release/git", {
+      "assets": ["CHANGELOG.md", "package.json", "package-lock.json", "public/manifest.json"],
+      "message": "chore(release): ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}"
+    }]
+  ]
+}

@@ -39,14 +39,12 @@ Dead files from the 2026-10-22 cleanup are parked in `.trash/` (git-ignored, ESL
 - **Image background:** the URL is user input placed inside CSS. Keep the `JSON.stringify` quoting in `App.tsx`.
 - **Manifest** (`public/manifest.json`): no `permissions`, host permission for `api.github.com` only. Don't add permissions the code doesn't use.
 
-## Conventions (summary of PRACTICES.md and the owner's preferences)
+## Conventions
 
-- Container/presentational split: `X.widget.tsx` (wiring only), `XView`/`XDisplay.tsx` (markup only), `useX.ts` (logic, returns a named `UseXResult` interface).
-- JSDoc on every export. Files of at most 150 lines (`SettingsModal.tsx` and `Sidebar.tsx` are already slightly over). Strict TS with `noUncheckedIndexedAccess` and `exactOptionalPropertyTypes`.
-- Use the path aliases `@app @features @components @hooks @stores @app-types @utils @widgets @locales`, never `../../`.
+PRACTICES.md is the full contract and matches the code; read it before adding a widget. In short:
+- Container/view split: `X.widget.tsx` (wiring only), `XView.tsx` (markup only), `useX.ts` (logic, returns a named `UseXResult`).
+- JSDoc on every export. Files of about 150 lines or fewer (`SettingsModal.tsx` and `Sidebar.tsx` are already slightly over). Strict TS.
+- Import through the path aliases, from the defining file. There are no top-level barrel files.
 - User-facing strings go through `useTranslation().t(key)`, with keys in `src/locales/translations.ts` (en + fr).
-
-**PRACTICES.md is out of date in three places.** Follow the code until the owner decides:
-- It says to use `chrome.storage` and never `localStorage`. The app actually uses `localStorage` (synchronous hydration means no empty first paint).
-- It requires zod validation of API responses. `zod` is installed, but nothing uses it yet.
-- It says consumers import from barrels. In practice, consumers import from deep paths.
+- Commits follow Conventional Commits, because releases depend on them.
+- Dependabot (`.github/dependabot.yml`) opens weekly PRs. A `fix(deps)` bump ships a patch release; `chore(deps-dev)` and `ci` bumps don't release.

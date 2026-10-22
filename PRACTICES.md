@@ -1,25 +1,25 @@
-# React & TypeScript Best Practices — Google Dashboard
+# Code Practices
 
-This document is the architectural contract for this project. All code must follow these rules.
+How code is written in this project. Follow these rules for new code. If a rule and the code disagree, fix one of them; don't leave both.
 
 ---
 
-## 1. Container / Presentational Split
+## 1. Container / view split
 
-Every widget and complex UI element is split into exactly two files:
+Each widget separates logic from markup:
 
-- **`[Name].widget.tsx`** (Container) — imports the custom hook, passes data as props. Contains zero styling logic, zero JSX markup beyond wiring the presentational component.
-- **`[Name]Display.tsx`** (Presentational) — receives data via typed props, renders HTML/JSX. Contains zero side effects; only `useMemo` / `useCallback` are permitted.
+- **`[Name].widget.tsx`** (container): calls the widget's hook and passes the results to the view as props. No styling and no logic.
+- **`[Name]View.tsx`** (view; the Clock uses `ClockDisplay.tsx`): receives typed props and renders JSX. No side effects. Only `useMemo`, `useCallback` and local UI `useState` are allowed.
 
 ```tsx
-// ✅ CORRECT — Container
+// ✅ Container
 export const Clock: FC<WidgetProps> = ({ instanceId }) => {
-  const { time, format } = useClockLogic(instanceId);
-  return <ClockDisplay time={time} format={format} />;
+  const { time, date, config } = useClockLogic(instanceId);
+  return <ClockDisplay time={time} date={date} showDate={config.showDate} />;
 };
 
-// ❌ WRONG — logic and presentation mixed
-export const Clock: FC<WidgetProps> = ({ instanceId }) => {
+// ❌ Logic and markup mixed
+export const Clock: FC<WidgetProps> = () => {
   const [time, setTime] = useState(new Date());
   useEffect(() => { const id = setInterval(() => setTime(new Date()), 1000); ... }, []);
   return <div className="text-4xl">{time.toLocaleTimeString()}</div>;
@@ -28,133 +28,29 @@ export const Clock: FC<WidgetProps> = ({ instanceId }) => {
 
 ---
 
-## 2. Custom Hooks Pattern
+## 2. Hooks
 
-- One hook per feature's logic: `useClockLogic.ts`, `useGmailMessages.ts`
-- Hooks **always return a plain typed object** — never a tuple unless it is exactly a 2-element `[value, setter]` pair
-- Hook return type is always an **explicit named interface**: `UseClockLogicResult`
-- Hooks **never return JSX**
-- Naming: `use[FeatureName][Aspect]` — e.g. `useGmailMessages`, `useCalendarEvents`
+- Each widget has one hook for its logic, for example `useTodo.ts` or `useGithubActivity.ts`.
+- A hook returns a plain object typed by an exported interface named `Use[Name]Result`. It never returns JSX.
+- A widget's default config lives in its hook as `export const DEFAULT_CONFIG`. The settings panel imports it from there and never defines its own copy.
 
-```typescript
-// ✅ CORRECT return shape
-interface UseClockLogicResult {
-  time: string;       // formatted "HH:MM:SS"
-  date: string;       // formatted date string
-  isBlinking: boolean;
-}
-export function useClockLogic(instanceId: string): UseClockLogicResult { ... }
+---
+
+## 3. File size
+
+Keep files under about 150 lines. When a file grows past that, move a sub-component into its own file, logic into a hook, or a large block of types into `*.types.ts`. Split by responsibility, never just to reduce the line count.
+
+---
+
+## 4. Imports
+
+Always use the path aliases, and import from the file that defines the thing:
+
+```ts
+import { Button } from '@components/ui/Button';           // ✅ (folder index.ts re-exports the component)
+import { useLayoutStore } from '@stores/layout.store';    // ✅
+import { Button } from '../../../components/ui/Button';  // ❌
 ```
-
----
-
-## 3. File Size Rule (≤150 lines)
-
-If a file approaches or exceeds 150 lines:
-1. Extract sub-components into their own files
-2. Extract logic into a custom hook
-3. Extract large type blocks into `*.types.ts`
-
-**No exceptions. Refactor first, then continue.**
-
----
-
-## 4. Barrel Exports
-
-Every folder has an `index.ts` that re-exports its public API:
-
-```typescript
-// src/features/clock/index.ts
-export { Clock } from './Clock.widget';
-export type { ClockConfig } from './clock.types';
-```
-
-- Consumers import from `@features/clock`, never from deep paths like `@features/clock/Clock.widget`
-- `index.ts` contains **only re-exports** — no logic, no side effects
-
----
-
-## 5. Naming Conventions
-
-| Pattern | File name | Export name |
-|---|---|---|
-| Widget container | `[Name].widget.tsx` | `[Name]` |
-| Widget view | `[Name]Display.tsx` | `[Name]Display` |
-| Settings panel | `[Name]Settings.tsx` | `[Name]Settings` |
-| Custom hook | `use[Name].ts` | `use[Name]` |
-| Zustand store | `[domain].store.ts` | `use[Domain]Store` |
-| Types file | `[domain].types.ts` | named interfaces |
-| Registration | `[domain].register.ts` | side-effect only |
-
----
-
-## 6. Context vs Zustand
-
-| Use case | Solution |
-|---|---|
-| Dashboard-wide state (layout, theme, auth) | Zustand store |
-| Per-widget persistent configuration | `useWidgetSettingsStore` keyed by `instanceId` |
-| Compound component internal wiring | React Context (scoped to component subtree) |
-| Transient UI state (open/closed, hover) | `useState` in the component |
-
-- **Never** use React Context for frequently-updating state — it re-renders all consumers
-- **Never** put transient UI state (modal open, hover state) in Zustand
-
----
-
-## 7. TypeScript Strictness Rules
-
-Config: `strict: true`, `noUncheckedIndexedAccess: true`, `exactOptionalPropertyTypes: true`
-
-- No `any` — use `unknown` + type narrowing instead
-- No `as Foo` type assertions **except** at system boundaries (API response parsing), always paired with zod validation
-- Props interfaces are named `[Component]Props` and exported from `*.types.ts`
-- All API responses are validated with **zod** before assignment to typed variables
-- `exactOptionalPropertyTypes` — omit optional keys rather than passing `undefined`
-
----
-
-## 8. JSDoc Style
-
-Every exported function, component, hook, and store action requires a JSDoc comment:
-
-```typescript
-/**
- * Formats a Date into a locale-aware time string.
- *
- * @param date - The date to format
- * @param locale - BCP 47 locale tag, defaults to navigator.language
- * @param use24h - If true, uses 24-hour format
- * @returns Formatted string, e.g. "14:32:05" or "2:32:05 PM"
- */
-export function formatTime(date: Date, locale?: string, use24h?: boolean): string { ... }
-```
-
-Components use `@param props` with individual prop descriptions:
-
-```typescript
-/**
- * Displays formatted time as a styled heading.
- *
- * @param props.time - Pre-formatted time string from useClockLogic
- * @param props.className - Optional additional Tailwind classes
- */
-export const ClockDisplay: FC<ClockDisplayProps> = ({ time, className }) => ...
-```
-
----
-
-## 9. Absolute Imports (Path Aliases)
-
-Always use path aliases. Never navigate up more than one level with relative paths:
-
-```typescript
-import { Button } from '@components/ui';       // ✅
-import { useLayoutStore } from '@stores/layout.store'; // ✅
-import { Button } from '../../../components/ui'; // ❌
-```
-
-Available aliases:
 
 | Alias | Maps to |
 |---|---|
@@ -162,38 +58,96 @@ Available aliases:
 | `@features/*` | `src/features/*` |
 | `@components/*` | `src/components/*` |
 | `@hooks/*` | `src/hooks/*` |
-| `@services/*` | `src/services/*` |
 | `@stores/*` | `src/stores/*` |
-| `@types/*` | `src/types/*` |
+| `@app-types/*` | `src/types/*` |
 | `@utils/*` | `src/utils/*` |
 | `@widgets/*` | `src/widgets/*` |
+| `@locales/*` | `src/locales/*` |
+
+Only the component folders under `src/components/` have an `index.ts`. There are no top-level barrel files (folder-level `index.ts` files that re-export everything); don't add them.
 
 ---
 
-## 10. Chrome Extension Rules
+## 5. Naming
 
-- All `chrome.*` API calls live **only** in `src/services/` or `src/utils/storage.utils.ts`
-- Never call `chrome.*` directly from a component or custom hook
-- Never use `localStorage` or `sessionStorage` — use `chrome.storage.local` via the typed wrappers in `storage.utils.ts`
-- `chrome.storage.sync` is used only for small user preferences (< 8KB total)
-- Background service workers (if added) are a separate Vite entry point under `src/background/`
+| What | File | Export |
+|---|---|---|
+| Widget container | `[Name].widget.tsx` | `[Name]` |
+| Widget view | `[Name]View.tsx` | `[Name]View` |
+| Settings panel | `[Name]Settings.tsx` | `[Name]Settings` |
+| Hook | `use[Name].ts` | `use[Name]` |
+| Zustand store | `[domain].store.ts` | `use[Domain]Store` |
+| Types | `[domain].types.ts` | named interfaces |
+| Registration | `[domain].register.ts` | side effect only |
+| Test | `[name].test.ts` next to the code | — |
 
 ---
 
-## 11. Widget System Contract
+## 6. Where state lives
 
-Every widget module must contain:
-
-| File | Responsibility |
+| Kind of state | Where |
 |---|---|
-| `[Name].widget.tsx` | Container component — connects hook to display |
-| `[Name]Display.tsx` | Presentational component — renders UI |
-| `[Name]Settings.tsx` | Settings form rendered in WidgetSettingsPanel |
-| `use[Name]Logic.ts` | All business logic for the widget |
-| `[name].types.ts` | `[Name]Config` interface + any local types |
-| `[name].register.ts` | Calls `registerWidget()` — side effect only |
-| `index.ts` | Barrel re-export |
+| Dashboard-wide (layout, theme, language) | A Zustand store in `src/stores/` |
+| Per-widget config and content | `useWidgetSettingsStore`, keyed by `instanceId`; read it with `useWidgetConfig(instanceId, DEFAULT_CONFIG)` |
+| Short-lived UI state (open/closed, hover, an input draft) | `useState` in the component |
 
-The dashboard grid (`DashboardGrid`) knows only widget IDs (strings). It calls `resolveWidget(id)` from the registry. It has **zero direct imports** of any specific widget.
+Never put short-lived UI state in a persisted store.
 
-**Adding a new widget = create one folder + add one import line to `src/widgets/index.ts`. Nothing else changes.**
+---
+
+## 7. Storage
+
+- Persisted stores use Zustand's `persist` middleware with `localStorage`. It's synchronous, so the dashboard renders with saved data on the first frame.
+- **Every persisted store must call `syncAcrossTabs(store)`** from `@utils/storage.utils`. Each new tab is a separate copy of the app, and without the sync a stale tab overwrites what another tab saved.
+- Use `partialize` to keep per-tab UI flags out of storage (see `isEditing` in `layout.store.ts`).
+- The only `chrome.*` call in the project is in `public/background.js` (the toolbar button). The app itself is a plain web page.
+
+---
+
+## 8. TypeScript
+
+The config uses `strict`, `noUncheckedIndexedAccess` and `exactOptionalPropertyTypes`.
+
+- No `any`. Use `unknown` and narrow it.
+- Avoid `as`. It's acceptable in two places:
+  - where data enters from outside (`fetch`, `JSON.parse`, `localStorage`). There, read optional fields defensively (`?? fallback`) and handle a failed parse.
+  - in generic plumbing that TypeScript can't express (`useWidgetConfig`, `Select`).
+- With `exactOptionalPropertyTypes`, leave an optional key out instead of passing `undefined`.
+
+---
+
+## 9. Comments and JSDoc
+
+- Every exported function, component, hook and store action has a JSDoc comment. Components document their props with `@param props.<name>`.
+- Inline comments explain *why*, not *what*.
+
+```ts
+/**
+ * Get the ISO week number (1–53) for a given date.
+ *
+ * @param date - The date to evaluate
+ * @returns ISO week number
+ */
+export function getWeekNumber(date: Date): number { ... }
+```
+
+---
+
+## 10. Adding a widget
+
+| File | Purpose |
+|---|---|
+| `use[Name].ts` | Logic and `DEFAULT_CONFIG` |
+| `[Name].widget.tsx` | Container |
+| `[Name]View.tsx` | Markup |
+| `[Name]Settings.tsx` | Optional settings form |
+| `[name].types.ts` | `[Name]Config` and local types |
+| `[name].register.ts` | Calls `registerWidget()` |
+
+Then add one import line to `src/widgets/index.ts`. Any new icon name goes in the `ICONS` list in `src/components/ui/Icon/Icon.tsx`. The grid knows widgets only by id, through `resolveWidget(id)`, and never imports a widget directly.
+
+---
+
+## 11. Commits
+
+Use [Conventional Commits](https://www.conventionalcommits.org). Releases are cut from the commit messages (see README → Releases): `fix:` makes a patch release, `feat:` a minor one, `feat!:` a major one. `docs:`, `chore:`, `refactor:`, `test:` and `ci:` don't release.

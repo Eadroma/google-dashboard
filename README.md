@@ -1,5 +1,9 @@
 # Google Dashboard
 
+[![CI](https://github.com/Eadroma/google-dashboard/actions/workflows/ci.yml/badge.svg)](https://github.com/Eadroma/google-dashboard/actions/workflows/ci.yml)
+[![Latest release](https://img.shields.io/github/v/release/Eadroma/google-dashboard)](https://github.com/Eadroma/google-dashboard/releases/latest)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 A Chrome extension that replaces the new-tab page with a dashboard of drag-and-drop widgets. Everything runs locally in the browser: no account, no server, no tracking.
 
 ## Widgets
@@ -18,19 +22,14 @@ You can also choose a solid, gradient or image background, and switch between En
 
 ## Install
 
-Requirements: Node.js 20+ and Chrome (or any Chromium browser: Edge, Brave, Opera GX).
+**From a release (no build needed):**
 
-```bash
-npm install
-npm run build
-```
-
-Then load the extension:
-
-1. Open `chrome://extensions`.
-2. Turn on **Developer mode**.
-3. Click **Load unpacked** and pick the `dist/` folder.
+1. Download `google-dashboard-<version>.zip` from the [latest release](https://github.com/Eadroma/google-dashboard/releases/latest) and unzip it.
+2. Open `chrome://extensions` and turn on **Developer mode**.
+3. Click **Load unpacked** and pick the unzipped folder.
 4. Open a new tab.
+
+**From source:** you need Node.js 22+. Run `npm install && npm run build`, then load the `dist/` folder the same way.
 
 If your browser doesn't let extensions override the new-tab page (Opera GX, for example), click the extension's toolbar icon to open the dashboard.
 
@@ -73,18 +72,13 @@ src/
   widgets/         Widget registry, and the list of widgets to load
 ```
 
-### Add a widget
+### Contributing
 
-1. Create `src/features/my-widget/` with these files:
-   - `useMyWidget.ts`: the logic. It reads config with `useWidgetConfig(instanceId, DEFAULT_CONFIG)` and exports `DEFAULT_CONFIG`.
-   - `MyWidget.widget.tsx`: a container that calls the hook and renders the view.
-   - `MyWidgetView.tsx`: the presentational part, with no logic.
-   - `MyWidgetSettings.tsx` (optional): the settings form, which imports `DEFAULT_CONFIG` from the hook.
-   - `myWidget.types.ts` and `myWidget.register.ts` (calls `registerWidget({ meta, Component, SettingsComponent })`).
-2. Add one import line to `src/widgets/index.ts`.
-3. If the widget uses an icon the app doesn't use yet, add it to `src/components/ui/Icon/Icon.tsx`.
+1. Fork the repo, create a branch, and make your change.
+2. Before opening a pull request, run `npm run lint && npm test && npm run build`. CI runs the same checks.
+3. Write commit messages as [Conventional Commits](https://www.conventionalcommits.org) (`feat: ...`, `fix: ...`). Releases are generated from them.
 
-See [PRACTICES.md](PRACTICES.md) for the full code conventions.
+To add a widget, follow [PRACTICES.md → Adding a widget](PRACTICES.md#10-adding-a-widget): one folder in `src/features/` and one import line in `src/widgets/index.ts`. PRACTICES.md has all the code conventions.
 
 ## Releases
 
@@ -134,3 +128,7 @@ If `main` is branch-protected, allow GitHub Actions to push to it. The release j
   - your search engine, when you search.
   - any background image URL you enter.
 - The extension asks for no Chrome permissions. Its only host permission is `api.github.com`.
+
+## License
+
+[MIT](LICENSE)
